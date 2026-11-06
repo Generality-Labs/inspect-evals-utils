@@ -1,3 +1,4 @@
+import functools
 import os
 from collections.abc import Callable
 from typing import Any, TypedDict, TypeVar
@@ -55,11 +56,31 @@ CI_BACKOFF_CONFIG: BackoffConfig = {
     "jitter": backoff.full_jitter,
 }
 
-BACKOFF_CONFIG = CI_BACKOFF_CONFIG if os.getenv("CI") else STANDARD_BACKOFF_CONFIG
+
+def _default_backoff_config() -> BackoffConfig:
+    return CI_BACKOFF_CONFIG if os.getenv("CI") else STANDARD_BACKOFF_CONFIG
+
+
+BACKOFF_CONFIG = _default_backoff_config()
 
 # One-slot holders, so the setters need no `global`.
+_backoff_config: list[BackoffConfig] = [BACKOFF_CONFIG]
 _hf_call_recorders: list[Callable[[str], None]] = []
 _backoff_recorders: list[Callable[[Details], None]] = []
+
+
+def set_backoff_config(config: BackoffConfig | None) -> None:
+    """Set the retry policy every wrapper uses from its next call on.
+
+    Pass None to go back to the default: CI_BACKOFF_CONFIG when the CI
+    environment variable is set, otherwise STANDARD_BACKOFF_CONFIG.
+    """
+    _backoff_config[:] = [config if config is not None else _default_backoff_config()]
+
+
+def get_backoff_config() -> BackoffConfig:
+    """The retry policy the wrappers will use for their next call."""
+    return _backoff_config[0]
 
 
 def set_hf_call_recorder(recorder: Callable[[str], None] | None) -> None:
@@ -134,6 +155,16 @@ def hf_backoff_policy(
         on_backoff=_record_backoff,
         giveup=lambda e: not should_retry(e),
     )
+
+
+def _with_backoff(func: Callable[P, R]) -> Callable[P, R]:
+    """Apply hf_backoff_policy with whatever config is set when the call happens."""
+
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        return hf_backoff_policy(**get_backoff_config())(func)(*args, **kwargs)
+
+    return wrapper
 
 
 def should_retry(err: Exception) -> bool:
@@ -222,7 +253,7 @@ def _ensure_revision(func_name: str, kwargs: dict[str, Any]) -> None:
         )
 
 
-@hf_backoff_policy(**BACKOFF_CONFIG)
+@_with_backoff
 def get_dataset_split_names(*args: Any, **kwargs: Any) -> list[str]:
     """Call `datasets.get_dataset_split_names` with exponential backoff and retry"""
     record_hf_call("get_dataset_split_names")
@@ -231,7 +262,7 @@ def get_dataset_split_names(*args: Any, **kwargs: Any) -> list[str]:
     return result
 
 
-@hf_backoff_policy(**BACKOFF_CONFIG)
+@_with_backoff
 def hf_dataset(*args: Any, **kwargs: Any) -> inspect_ai.dataset.Dataset:
     """Call `inspect_ai.dataset.hf_dataset` with exponential backoff and retry"""
     record_hf_call("hf_dataset")
@@ -240,7 +271,7 @@ def hf_dataset(*args: Any, **kwargs: Any) -> inspect_ai.dataset.Dataset:
     return inspect_ai.dataset.hf_dataset(*args, **kwargs)
 
 
-@hf_backoff_policy(**BACKOFF_CONFIG)
+@_with_backoff
 def load_dataset(*args: Any, **kwargs: Any) -> datasets.Dataset:
     """Call `datasets.load_dataset` with exponential backoff and retry"""
     record_hf_call("load_dataset")
@@ -248,7 +279,7 @@ def load_dataset(*args: Any, **kwargs: Any) -> datasets.Dataset:
     return datasets.load_dataset(*args, **kwargs)
 
 
-@hf_backoff_policy(**BACKOFF_CONFIG)
+@_with_backoff
 def snapshot_download(*args: Any, **kwargs: Any) -> Any:
     """Call `huggingface_hub.snapshot_download` with exponential backoff and retry"""
     record_hf_call("snapshot_download")
@@ -256,7 +287,7 @@ def snapshot_download(*args: Any, **kwargs: Any) -> Any:
     return huggingface_hub.snapshot_download(*args, **kwargs)
 
 
-@hf_backoff_policy(**BACKOFF_CONFIG)
+@_with_backoff
 def hf_hub_download(*args: Any, **kwargs: Any) -> Any:
     """Call `huggingface_hub.hf_hub_download` with exponential backoff and retry"""
     record_hf_call("hf_hub_download")
@@ -267,7 +298,7 @@ def hf_hub_download(*args: Any, **kwargs: Any) -> Any:
 # The wrappers below import their library inside the function body because the
 # import is slow and the library is an optional dependency. Argument validation
 # runs before the import so a missing revision fails without loading the library.
-@hf_backoff_policy(**BACKOFF_CONFIG)
+@_with_backoff
 def sentence_transformer(*args: Any, **kwargs: Any) -> Any:
     """Call `sentence_transformers.SentenceTransformer` with exponential backoff and retry."""
     record_hf_call("sentence_transformer")
@@ -277,7 +308,7 @@ def sentence_transformer(*args: Any, **kwargs: Any) -> Any:
     return SentenceTransformer(*args, **kwargs)
 
 
-@hf_backoff_policy(**BACKOFF_CONFIG)
+@_with_backoff
 def transformers_pipeline(*args: Any, **kwargs: Any) -> Any:
     """Call `transformers.pipeline` with exponential backoff and retry."""
     record_hf_call("transformers_pipeline")
@@ -287,7 +318,7 @@ def transformers_pipeline(*args: Any, **kwargs: Any) -> Any:
     return transformers.pipeline(*args, **kwargs)
 
 
-@hf_backoff_policy(**BACKOFF_CONFIG)
+@_with_backoff
 def auto_model_for_sequence_classification(*args: Any, **kwargs: Any) -> Any:
     """Call `transformers.AutoModelForSequenceClassification.from_pretrained` with exponential backoff and retry."""
     record_hf_call("auto_model_for_sequence_classification")
@@ -297,7 +328,7 @@ def auto_model_for_sequence_classification(*args: Any, **kwargs: Any) -> Any:
     return transformers.AutoModelForSequenceClassification.from_pretrained(*args, **kwargs)
 
 
-@hf_backoff_policy(**BACKOFF_CONFIG)
+@_with_backoff
 def auto_tokenizer(*args: Any, **kwargs: Any) -> Any:
     """Call `transformers.AutoTokenizer.from_pretrained` with exponential backoff and retry."""
     record_hf_call("auto_tokenizer")

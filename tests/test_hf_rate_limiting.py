@@ -7,10 +7,14 @@ from huggingface_hub.errors import LocalEntryNotFoundError
 
 from inspect_evals_utils.huggingface import (
     BACKOFF_CONFIG,
+    CI_BACKOFF_CONFIG,
+    STANDARD_BACKOFF_CONFIG,
+    get_backoff_config,
     hf_backoff_policy,
     hf_dataset,
     hf_hub_download,
     load_dataset,
+    set_backoff_config,
     set_backoff_recorder,
     set_hf_call_recorder,
     snapshot_download,
@@ -257,3 +261,27 @@ def test_backoff_recorder_receives_backoff_details() -> None:
     assert len(details) == 1
     assert details[0]["tries"] == 1
     assert details[0]["wait"] > 0
+
+
+def test_set_backoff_config_applies_to_the_wrappers() -> None:
+    set_backoff_config({**BACKOFF_CONFIG, "max_tries": 1})
+    try:
+        with (
+            patch("time.sleep") as mock_sleep,
+            patch("datasets.load_dataset", side_effect=LocalEntryNotFoundError("Error")),
+            pytest.raises(LocalEntryNotFoundError),
+        ):
+            load_dataset("org/repo", revision="123")
+        mock_sleep.assert_not_called()
+    finally:
+        set_backoff_config(None)
+    assert get_backoff_config() == BACKOFF_CONFIG
+
+
+def test_default_backoff_config_follows_the_ci_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CI", "1")
+    set_backoff_config(None)
+    assert get_backoff_config() == CI_BACKOFF_CONFIG
+    monkeypatch.delenv("CI")
+    set_backoff_config(None)
+    assert get_backoff_config() == STANDARD_BACKOFF_CONFIG

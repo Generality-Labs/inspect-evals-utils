@@ -17,6 +17,15 @@ EXPORTS = {
     "Prompt": "prompts",
     "shuffle_and_seed": "shuffle",
     "INSPECT_EVALS_CACHE_PATH": "cache",
+    "GRADER_FAILED": "scorers",
+    "GRADER_PARSE_FAILURE": "scorers",
+    "GraderFailureMode": "scorers",
+    "VerdictMatch": "scorers",
+    "VerdictParseFailure": "scorers",
+    "find_verdict": "scorers",
+    "parse_verdict": "scorers",
+    "VERDICT_LABEL": "scorers",
+    "verdict_instruction": "scorers",
 }
 
 

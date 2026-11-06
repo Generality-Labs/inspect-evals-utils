@@ -2,7 +2,7 @@
 
 import pytest
 
-from inspect_evals_utils.scorers import VerdictParseFailure, find_verdict
+from inspect_evals_utils.scorers import VerdictMatch, VerdictParseFailure, find_verdict
 
 
 @pytest.mark.parametrize(
@@ -29,3 +29,113 @@ def test_find_verdict_empty_text_is_failure(text: str, anchor: str) -> None:
     result = find_verdict(text, ["yes", "no"], anchor=anchor, position="last", label=label)
     assert isinstance(result, VerdictParseFailure)
     assert result.text == text
+
+
+YES_NO = ["yes", "no"]
+
+LABEL_CASES = [
+    # id, text, label, tokens, position, ignore_quoted, expected
+    (
+        "reason-then-verdict",
+        "The answer is wrong because...\nAnswer: no",
+        "answer",
+        YES_NO,
+        "last",
+        False,
+        "no",
+    ),
+    (
+        "both-tokens-in-reasoning",
+        "Not yes, not no, hard to say.\nAnswer: yes",
+        "answer",
+        YES_NO,
+        "last",
+        False,
+        "yes",
+    ),
+    ("quoted-line-ignored", "> Answer: yes\nAnswer: no", "answer", YES_NO, "last", True, "no"),
+    ("quoted-line-counted", "> Answer: yes\nAnswer: no", "answer", YES_NO, "first", False, "yes"),
+    ("incorrect-is-not-correct", "incorrect: yes", "correct", YES_NO, "last", False, None),
+    ("numbered", "1. Answer: yes", "answer", YES_NO, "last", False, "yes"),
+    ("bulleted", "- Answer: yes", "answer", YES_NO, "last", False, "yes"),
+    ("block-quoted", "> Answer: yes", "answer", YES_NO, "last", False, "yes"),
+    ("heading", "## Answer: yes", "answer", YES_NO, "last", False, "yes"),
+    ("mixed-prefix", "> - **Answer:** yes", "answer", YES_NO, "last", False, "yes"),
+    ("bold-label-and-colon", "**Answer:** yes", "answer", YES_NO, "last", False, "yes"),
+    ("bold-label-only", "**Answer**: yes", "answer", YES_NO, "last", False, "yes"),
+    ("bold-token", "Answer: **yes**", "answer", YES_NO, "last", False, "yes"),
+    ("capitalised", "Correct: Yes", "correct", YES_NO, "last", False, "yes"),
+    ("tag-form", "<answer>yes</answer>", "answer", YES_NO, "last", False, "yes"),
+    ("bare-tag-separator", "answer>yes", "answer", YES_NO, "last", False, "yes"),
+    ("equals-separator", "answer = no", "answer", YES_NO, "last", False, "no"),
+    ("two-tokens-fail", "Answer: yes or no", "answer", YES_NO, "last", False, None),
+    (
+        "prose-after-verdict-fails",
+        "ANSWER: INCORRECT, the claim is not correct.",
+        "answer",
+        ["CORRECT", "INCORRECT"],
+        "last",
+        False,
+        None,
+    ),
+    ("same-token-twice-ok", "Answer: yes. Yes.", "answer", YES_NO, "last", False, "yes"),
+    ("label-then-newline", "Answer:\nyes", "answer", YES_NO, "last", False, None),
+    (
+        "last-labelled-line-invalid",
+        "ANSWER: yes\n...\nANSWER: maybe",
+        "answer",
+        YES_NO,
+        "last",
+        False,
+        None,
+    ),
+    ("first-of-several", "ANSWER: yes\nANSWER: no", "answer", YES_NO, "first", False, "yes"),
+    ("last-of-several", "ANSWER: yes\nANSWER: no", "answer", YES_NO, "last", False, "no"),
+    (
+        "all-fields-no-verdict",
+        "extracted_final_answer: 42\nreasoning: matches\nconfidence: 90",
+        "correct",
+        YES_NO,
+        "last",
+        False,
+        None,
+    ),
+    ("rating-off-scale", "Rating: 7", "rating", ["1", "2", "3", "4", "5"], "last", False, None),
+    ("rating-on-scale", "Rating: 4", "rating", ["1", "2", "3", "4", "5"], "last", False, "4"),
+    ("nbsp-after-separator", "ANSWER:\u00a0yes", "answer", YES_NO, "last", False, "yes"),
+    ("label-prefix-of-word", "answers: yes", "answer", YES_NO, "last", False, None),
+    ("trailing-punctuation", "ANSWER: yes.", "answer", YES_NO, "last", False, "yes"),
+    ("token-prefix-of-word", "Answer: yesterday", "answer", YES_NO, "last", False, None),
+    ("crlf", "Reasoning.\r\nAnswer: no\r\n", "answer", YES_NO, "last", False, "no"),
+]
+
+
+@pytest.mark.parametrize(
+    ("text", "label", "tokens", "position", "ignore_quoted", "expected"),
+    [case[1:] for case in LABEL_CASES],
+    ids=[case[0] for case in LABEL_CASES],
+)
+def test_find_verdict_label_mode(
+    text: str,
+    label: str,
+    tokens: list[str],
+    position: str,
+    ignore_quoted: bool,
+    expected: str | None,
+) -> None:
+    result = find_verdict(
+        text, tokens, anchor="label", position=position, label=label, ignore_quoted=ignore_quoted
+    )
+    if expected is None:
+        assert isinstance(result, VerdictParseFailure)
+    else:
+        assert isinstance(result, VerdictMatch)
+        assert result.token == expected
+
+
+def test_find_verdict_label_mode_offsets_index_original_text() -> None:
+    text = "Reasoning.\r\nAnswer: **no**\r\n"
+    result = find_verdict(text, YES_NO, anchor="label", position="last", label="answer")
+    assert isinstance(result, VerdictMatch)
+    assert text[result.start : result.end].lower() == "no"
+    assert result.line == "Answer: **no**"

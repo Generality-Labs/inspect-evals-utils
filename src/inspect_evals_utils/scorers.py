@@ -6,7 +6,8 @@ failure the same way the registry does. ``schema_tool_graded_scorer`` stays in
 inspect_evals: it uses private inspect_ai registry APIs.
 """
 
-from collections.abc import Iterable
+import re
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from typing import Final, Literal
 
@@ -100,6 +101,79 @@ def _validate_tokens(tokens: Iterable[str]) -> list[str]:
     return token_list
 
 
+# Horizontal whitespace, including the non-breaking and zero-width characters a judge
+# can emit around a separator.
+_HSPACE = "[ \t\u00a0\u200b\u200c\u200d\ufeff]"
+_EMPHASIS = r"[*_`]"
+# What may stand before a label or a leading token: list markers, a block quote, a
+# heading and markdown emphasis, in any mix. A bullet needs a space after it so that
+# the ``**`` of bold text is read as emphasis rather than as a bullet.
+_PREFIX = (
+    rf"(?:{_HSPACE}*(?:[-*+]{_HSPACE}+|\d+[.)]{_HSPACE}+|>{_HSPACE}*|#+{_HSPACE}+"
+    rf"|{_EMPHASIS}+))*{_HSPACE}*"
+)
+# Between a label and its token: optional emphasis either side of the separator.
+_SEPARATOR = rf"{_EMPHASIS}*{_HSPACE}*[:=>]{_HSPACE}*{_EMPHASIS}*{_HSPACE}*"
+_LINE_ENDING = re.compile(r"\r\n|\r|\n")
+_QUOTED = re.compile(rf"^{_HSPACE}*>")
+
+
+def _iter_lines(text: str) -> Iterator[tuple[int, int, str]]:
+    """Yield ``(start, end, line)`` for each line, with offsets into ``text``.
+
+    The line ending is not part of ``line``, so CRLF text needs no rewriting
+    and offsets index the caller's string.
+    """
+    start = 0
+    for ending in _LINE_ENDING.finditer(text):
+        yield start, ending.start(), text[start : ending.start()]
+        start = ending.end()
+    if start < len(text):
+        yield start, len(text), text[start:]
+
+
+def _token_regex(tokens: list[str]) -> re.Pattern[str]:
+    """Match any token as a whole word, case-insensitively, longest token first."""
+    alternatives = "|".join(re.escape(t) for t in sorted(tokens, key=len, reverse=True))
+    return re.compile(rf"(?<!\w)(?:{alternatives})(?!\w)", re.IGNORECASE)
+
+
+def _label_regex(label: str) -> re.Pattern[str]:
+    """Match a line's prefix, the label and its separator, up to where the token starts."""
+    return re.compile(
+        rf"^{_PREFIX}<?{_HSPACE}*{re.escape(label)}{_HSPACE}*{_SEPARATOR}", re.IGNORECASE
+    )
+
+
+def _read_token(
+    tokens: list[str],
+    token_regex: re.Pattern[str],
+    line_start: int,
+    line: str,
+    from_offset: int,
+    detail_when_missing: str,
+) -> VerdictMatch | VerdictParseFailure:
+    """Read the one verdict on a candidate line, scanning from ``from_offset``.
+
+    A line that names two different tokens is a failure: ``Answer: yes or no``
+    carries no verdict, and reading its first token would hide that.
+    """
+    spelled = {t.casefold(): t for t in tokens}
+    matches = list(token_regex.finditer(line, from_offset))
+    distinct = {m.group(0).casefold() for m in matches}
+    if not distinct:
+        return VerdictParseFailure(line, detail_when_missing)
+    if len(distinct) > 1:
+        return VerdictParseFailure(line, "two verdicts on one line")
+    first = matches[0]
+    return VerdictMatch(
+        token=spelled[first.group(0).casefold()],
+        start=line_start + first.start(),
+        end=line_start + first.end(),
+        line=line,
+    )
+
+
 def find_verdict(
     text: str,
     tokens: Iterable[str],
@@ -139,5 +213,30 @@ def find_verdict(
         raise ValueError("label is only used with anchor='label'")
     if not text.strip():
         return VerdictParseFailure(text, "empty reply")
-    del token_list
-    raise NotImplementedError
+
+    lines = [
+        (start, end, line)
+        for start, end, line in _iter_lines(text)
+        if not (ignore_quoted and _QUOTED.match(line))
+    ]
+    token_regex = _token_regex(token_list)
+
+    if anchor == "label":
+        assert label is not None
+        label_regex = _label_regex(label)
+        labelled = [
+            (start, line, found.end())
+            for start, _end, line in lines
+            if (found := label_regex.match(line)) is not None
+        ]
+        if not labelled:
+            return VerdictParseFailure(text, "no labelled line")
+        start, line, token_from = labelled[0] if position == "first" else labelled[-1]
+        result = _read_token(
+            token_list, token_regex, start, line, token_from, "no verdict on the labelled line"
+        )
+    else:
+        raise NotImplementedError
+    if isinstance(result, VerdictParseFailure):
+        return VerdictParseFailure(text, result.detail)
+    return result

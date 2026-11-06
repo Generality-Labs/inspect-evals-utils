@@ -1,0 +1,9 @@
+title: Sample Eval
+description: A minimal eval used by the README generator tests.
+group: Testing
+contributors:
+  - octocat
+version: 1-A
+tasks:
+  - name: sample_task
+    dataset_samples: 5

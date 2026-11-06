@@ -16,6 +16,7 @@ uv add "inspect-evals-utils[huggingface]"
 - `inspect_evals_utils.datasets`: `load_json_dataset` and `load_csv_dataset`, which cache remote files and retry transient errors, plus `cache_dataset_loader`, `is_remote_url`, `get_cached_fname`, `is_transient_error`.
 - `inspect_evals_utils.huggingface` (needs the `huggingface` extra): `hf_dataset`, `load_dataset`, `get_dataset_split_names`, `snapshot_download`, `hf_hub_download`, `sentence_transformer`, `transformers_pipeline`, `auto_model_for_sequence_classification`, `auto_tokenizer`. Each retries on rate limits and transient errors and requires a `revision=` keyword, so datasets are pinned. `set_backoff_config` changes the retry policy for later calls (the default is `CI_BACKOFF_CONFIG` when the `CI` environment variable is set, otherwise `STANDARD_BACKOFF_CONFIG`). `set_hf_call_recorder` and `set_backoff_recorder` register callbacks that test sessions use to count calls and retries; both default to doing nothing.
 - `inspect_evals_utils.code`: `extract_code_blocks`, `extract_code_block`, `strip_json_fence`, `defines`.
+- `inspect_evals_utils.scorers`: the `ScoreReason` constants (`GRADER_FAILED`, `SCORING_FAILED`, `NO_RESPONSE`, `REFUSAL`, `INVALID_RESPONSE_FORMAT`) and `GraderFailureMode` with its constants, moved from `inspect_evals.utils.scorers`.
 - `inspect_evals_utils.messages`: `message_content_text`, `reasoning_to_text`.
 - `inspect_evals_utils.prompts`: `Prompt`, a dataclass recording a prompt with its provenance.
 - `inspect_evals_utils.shuffle`: `shuffle_and_seed`.

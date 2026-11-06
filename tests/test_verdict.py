@@ -1,6 +1,7 @@
 """Tests for the free-text verdict parser in inspect_evals_utils.scorers."""
 
 import math
+import time
 
 import pytest
 from inspect_ai.scorer import CORRECT, INCORRECT
@@ -115,6 +116,28 @@ LABEL_CASES = [
     ("rating-off-scale", "Rating: 7", "rating", ["1", "2", "3", "4", "5"], "last", False, None),
     ("rating-on-scale", "Rating: 4", "rating", ["1", "2", "3", "4", "5"], "last", False, "4"),
     ("nbsp-after-separator", "ANSWER:\u00a0yes", "answer", YES_NO, "last", False, "yes"),
+    ("tab-after-separator", "ANSWER:\tyes", "answer", YES_NO, "last", False, "yes"),
+    ("underscore-token", "Answer: _yes_", "answer", YES_NO, "last", False, "yes"),
+    ("double-underscore-token", "Answer: __no__", "answer", YES_NO, "last", False, "no"),
+    (
+        "label-is-a-token-word",
+        "Correct: INCORRECT",
+        "correct",
+        ["CORRECT", "INCORRECT"],
+        "last",
+        False,
+        "INCORRECT",
+    ),
+    (
+        "numbered-numeric-token",
+        "1. Rating: 3",
+        "rating",
+        ["1", "2", "3", "4", "5"],
+        "last",
+        False,
+        "3",
+    ),
+    ("dotless-i-folds-to-i", "Answer: \u0131", "answer", ["i", "o"], "last", False, "i"),
     ("label-prefix-of-word", "answers: yes", "answer", YES_NO, "last", False, None),
     ("trailing-punctuation", "ANSWER: yes.", "answer", YES_NO, "last", False, "yes"),
     ("token-prefix-of-word", "Answer: yesterday", "answer", YES_NO, "last", False, None),
@@ -162,6 +185,7 @@ LINE_CASES = [
     ("bare-zero", "0", ["0", "1"], "first", False, "0"),
     ("capitalised-first", "Yes, because the file exists.", YES_NO, "first", False, "yes"),
     ("bold-first", "**No**, the file is missing.", YES_NO, "first", False, "no"),
+    ("underscore-first", "_No_, the file is missing.", YES_NO, "first", False, "no"),
     ("bulleted", "- yes", YES_NO, "first", False, "yes"),
     ("yesterday", "yesterday it worked", YES_NO, "first", False, None),
     ("knowledge", "knowledge is missing", ["y", "n"], "first", False, None),
@@ -277,3 +301,17 @@ def test_verdict_instruction_round_trips_through_find_verdict() -> None:
 def test_verdict_instruction_rejects_single_token() -> None:
     with pytest.raises(ValueError, match="two"):
         verdict_instruction(["yes"])
+
+
+@pytest.mark.parametrize(
+    "run",
+    ["*" * 26 + " nothing here", "_" * 26 + " nothing here", "> " * 26 + "nothing here"],
+    ids=["asterisks", "underscores", "quotes"],
+)
+def test_find_verdict_prefix_runs_do_not_backtrack(run: str) -> None:
+    text = run + "\nAnswer: yes"
+    started = time.perf_counter()
+    result = find_verdict(text, YES_NO, anchor="label", position="last", label="answer")
+    assert time.perf_counter() - started < 0.5
+    assert isinstance(result, VerdictMatch)
+    assert result.token == "yes"

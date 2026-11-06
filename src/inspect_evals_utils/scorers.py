@@ -128,9 +128,12 @@ _EMPHASIS = r"[*_`]"
 # What may stand before a label or a leading token: list markers, a block quote, a
 # heading and markdown emphasis, in any mix. A bullet needs a space after it so that
 # the ``**`` of bold text is read as emphasis rather than as a bullet.
+# Possessive quantifiers: a run of emphasis or quote markers on a line that turns out
+# not to be a labelled line must not be re-split on every failed match, which
+# otherwise costs exponential time in the length of the run.
 _PREFIX = (
-    rf"(?:{_HSPACE}*(?:[-*+]{_HSPACE}+|\d+[.)]{_HSPACE}+|>{_HSPACE}*|#+{_HSPACE}+"
-    rf"|{_EMPHASIS}+))*{_HSPACE}*"
+    rf"(?:{_HSPACE}*+(?:[-*+]{_HSPACE}++|\d+[.)]{_HSPACE}++|>{_HSPACE}*+|#+{_HSPACE}++"
+    rf"|{_EMPHASIS}++))*+{_HSPACE}*+"
 )
 # Between a label and its token: optional emphasis either side of the separator.
 _SEPARATOR = rf"{_EMPHASIS}*{_HSPACE}*[:=>]{_HSPACE}*{_EMPHASIS}*{_HSPACE}*"
@@ -154,9 +157,23 @@ def _iter_lines(text: str) -> Iterator[tuple[int, int, str]]:
 
 
 def _token_regex(tokens: list[str]) -> re.Pattern[str]:
-    """Match any token as a whole word, case-insensitively, longest token first."""
-    alternatives = "|".join(re.escape(t) for t in sorted(tokens, key=len, reverse=True))
-    return re.compile(rf"(?<!\w)(?:{alternatives})(?!\w)", re.IGNORECASE)
+    """Match any token as a whole word, case-insensitively, longest token first.
+
+    Each token gets a named group ``t<index>`` so a match maps back to the
+    caller's spelling through ``lastgroup`` rather than through a second case
+    fold, which can disagree with ``re.IGNORECASE`` (U+0131 folds to itself but
+    matches ``i``). The boundaries treat ``_`` as punctuation, so a token
+    wrapped in underscore emphasis is still a whole word.
+    """
+    order = sorted(range(len(tokens)), key=lambda i: len(tokens[i]), reverse=True)
+    alternatives = "|".join(f"(?P<t{i}>{re.escape(tokens[i])})" for i in order)
+    return re.compile(rf"(?<![^\W_])(?:{alternatives})(?![^\W_])", re.IGNORECASE)
+
+
+def _matched_token(tokens: list[str], match: re.Match[str]) -> str:
+    """The caller's spelling of the token ``match`` found."""
+    assert match.lastgroup is not None
+    return tokens[int(match.lastgroup[1:])]
 
 
 def _label_regex(label: str) -> re.Pattern[str]:
@@ -179,16 +196,15 @@ def _read_token(
     A line that names two different tokens is a failure: ``Answer: yes or no``
     carries no verdict, and reading its first token would hide that.
     """
-    spelled = {t.casefold(): t for t in tokens}
     matches = list(token_regex.finditer(line, from_offset))
-    distinct = {m.group(0).casefold() for m in matches}
+    distinct = {m.lastgroup for m in matches}
     if not distinct:
         return VerdictParseFailure(line, detail_when_missing)
     if len(distinct) > 1:
         return VerdictParseFailure(line, "two verdicts on one line")
     first = matches[0]
     return VerdictMatch(
-        token=spelled[first.group(0).casefold()],
+        token=_matched_token(tokens, first),
         start=line_start + first.start(),
         end=line_start + first.end(),
         line=line,
@@ -205,6 +221,12 @@ def find_verdict(
     ignore_quoted: bool = False,
 ) -> VerdictMatch | VerdictParseFailure:
     """Read a single-value verdict from a judge's free-text reply.
+
+    The selected line must name exactly one token. Under ``anchor="label"``
+    that check scans the line from just after the separator, so a label that
+    is itself a token (``Correct: INCORRECT``) or a numbered list marker
+    (``1. Rating: 3``) does not count as a second verdict. Under
+    ``anchor="line"`` it scans the whole line.
 
     Args:
         text: The judge's reply.

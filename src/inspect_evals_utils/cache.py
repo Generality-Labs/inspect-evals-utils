@@ -22,7 +22,7 @@ def cache_path() -> Path:
     if not path.is_absolute():
         raise ValueError(
             f"INSPECT_EVALS_CACHE_DIR must be absolute or start with ~, but is "
-            f"{configured!r}. It is read once when inspect_evals is imported, so "
+            f"{configured!r}. It is read once when inspect_evals_utils is imported, so "
             f"a relative path would point somewhere different depending on where "
             f"the eval was started from."
         )

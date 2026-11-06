@@ -5,10 +5,7 @@ sections if they don't already exist. It can intelligently place the new section
 after a specified list of existing sections (in priority order).
 
 Usage:
-    python tools/add_readme_section.py \
-        --key "Parameters" \
-        --insert-after "Options" \
-        --insert-after "Usage"
+    inspect-evals-readmes add-section --key Parameters --insert-after Options --insert-after Usage
 
 The script will:
 1. Discover all eval paths from individual eval.yaml files

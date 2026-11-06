@@ -1,4 +1,3 @@
-# MANAGED FILE - Updates pulled from template. See MANAGED_FILES.md
 """Unit tests for add_readme_section.py script."""
 
 from pathlib import Path

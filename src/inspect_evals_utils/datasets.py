@@ -217,7 +217,7 @@ def cache_dataset_loader() -> Callable[
 
 
 # Type stub functions for mypy
-def load_json_dataset(  # type: ignore[empty-body]
+def load_json_dataset(
     file_path: str,
     eval_name: str,
     sample_fields: Any = None,
@@ -258,7 +258,7 @@ def load_json_dataset(  # type: ignore[empty-body]
     raise NotImplementedError  # replaced by the decorated implementation below
 
 
-def load_csv_dataset(  # type: ignore[empty-body]
+def load_csv_dataset(
     file_path: str,
     eval_name: str,
     sample_fields: Any = None,

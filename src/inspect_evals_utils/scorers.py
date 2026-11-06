@@ -314,3 +314,35 @@ def parse_verdict(
     if isinstance(match, VerdictParseFailure):
         return match
     return tokens[match.token]
+
+
+VERDICT_LABEL: Final[str] = "ANSWER"
+"""The label ``verdict_instruction`` asks for. Pair it with ``anchor="label"``."""
+
+
+def verdict_instruction(tokens: Iterable[str], *, label: str = VERDICT_LABEL) -> str:
+    """One sentence telling the judge how to end its reply.
+
+    For ``("yes", "no")`` it returns ``End your reply with a line of the form
+    `ANSWER: yes` or `ANSWER: no`, and nothing after it.`` Read the reply
+    with ``parse_verdict(..., anchor="label", label=VERDICT_LABEL,
+    position="last")``. An eval that keeps an upstream prompt for parity
+    does not use this sentence; it states whatever anchor and position that
+    prompt implies.
+
+    Args:
+        tokens: The verdicts the judge may give, at least two.
+        label: The field name to ask for.
+
+    Returns:
+        The instruction sentence.
+
+    Raises:
+        ValueError: Fewer than two tokens, or an unusable token set.
+    """
+    token_list = _validate_tokens(tokens)
+    if len(token_list) < 2:
+        raise ValueError("verdict_instruction needs at least two tokens")
+    forms = [f"`{label}: {token}`" for token in token_list]
+    listed = f"{', '.join(forms[:-1])} or {forms[-1]}"
+    return f"End your reply with a line of the form {listed}, and nothing after it."

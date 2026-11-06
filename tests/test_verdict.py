@@ -8,10 +8,12 @@ from inspect_ai.scorer import CORRECT, INCORRECT
 from inspect_evals_utils.scorers import (
     GRADER_FAILED,
     GRADER_PARSE_FAILURE,
+    VERDICT_LABEL,
     VerdictMatch,
     VerdictParseFailure,
     find_verdict,
     parse_verdict,
+    verdict_instruction,
 )
 
 
@@ -249,3 +251,29 @@ def test_parse_verdict_failure_unscored() -> None:
     assert score.metadata["checkpoint"] == 3
     assert score.explanation is not None
     assert "I cannot tell." in score.explanation
+
+
+def test_verdict_instruction_two_tokens() -> None:
+    assert verdict_instruction(["yes", "no"]) == (
+        "End your reply with a line of the form `ANSWER: yes` or `ANSWER: no`, "
+        "and nothing after it."
+    )
+
+
+def test_verdict_instruction_three_tokens_custom_label() -> None:
+    assert verdict_instruction(["1", "2", "3"], label="Rating") == (
+        "End your reply with a line of the form `Rating: 1`, `Rating: 2` or `Rating: 3`, "
+        "and nothing after it."
+    )
+
+
+def test_verdict_instruction_round_trips_through_find_verdict() -> None:
+    reply = "Some reasoning.\n" + f"{VERDICT_LABEL}: no"
+    match = find_verdict(reply, YES_NO, anchor="label", position="last", label=VERDICT_LABEL)
+    assert isinstance(match, VerdictMatch)
+    assert match.token == "no"
+
+
+def test_verdict_instruction_rejects_single_token() -> None:
+    with pytest.raises(ValueError, match="two"):
+        verdict_instruction(["yes"])

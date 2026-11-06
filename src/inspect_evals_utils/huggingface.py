@@ -4,6 +4,7 @@ from typing import Any, TypedDict, TypeVar
 
 import backoff
 import inspect_ai.dataset
+from backoff.types import Details
 from typing_extensions import ParamSpec
 
 try:
@@ -19,7 +20,6 @@ except ImportError as e:
         "install inspect-evals-utils[huggingface]"
     ) from e
 
-from inspect_evals_utils.hf_telemetry import record_backoff, record_hf_call
 
 Jitterer = Callable[[float], float]
 
@@ -56,6 +56,38 @@ CI_BACKOFF_CONFIG: BackoffConfig = {
 }
 
 BACKOFF_CONFIG = CI_BACKOFF_CONFIG if os.getenv("CI") else STANDARD_BACKOFF_CONFIG
+
+# One-slot holders, so the setters need no `global`.
+_hf_call_recorders: list[Callable[[str], None]] = []
+_backoff_recorders: list[Callable[[Details], None]] = []
+
+
+def set_hf_call_recorder(recorder: Callable[[str], None] | None) -> None:
+    """Register a callback told the wrapper name before each Hugging Face call.
+
+    Test sessions use this to count calls per test. Pass None to remove it.
+    """
+    _hf_call_recorders[:] = [recorder] if recorder is not None else []
+
+
+def set_backoff_recorder(recorder: Callable[[Details], None] | None) -> None:
+    """Register a callback given the `backoff` details dict on each retry wait.
+
+    The dict has the keys `backoff.on_exception` passes to `on_backoff`, such as
+    `wait` (seconds) and `tries`. Pass None to remove it.
+    """
+    _backoff_recorders[:] = [recorder] if recorder is not None else []
+
+
+def record_hf_call(func_name: str) -> None:
+    for recorder in _hf_call_recorders:
+        recorder(func_name)
+
+
+def _record_backoff(details: Details) -> None:
+    for recorder in _backoff_recorders:
+        recorder(details)
+
 
 TRANSIENT_ERROR_CODES = {
     429: "Too many requests... likely the HF rate limit policy has been violated",
@@ -99,7 +131,7 @@ def hf_backoff_policy(
         factor=60 * initial_wait_mins,
         max_value=60 * max_wait_mins,
         jitter=jitter,
-        on_backoff=record_backoff,
+        on_backoff=_record_backoff,
         giveup=lambda e: not should_retry(e),
     )
 

@@ -5,17 +5,14 @@ import httpx
 import pytest
 from huggingface_hub.errors import LocalEntryNotFoundError
 
-from inspect_evals_utils.hf_telemetry import (
-    hf_telemetry_end_test,
-    hf_telemetry_snapshot,
-    hf_telemetry_start_test,
-)
 from inspect_evals_utils.huggingface import (
     BACKOFF_CONFIG,
     hf_backoff_policy,
     hf_dataset,
     hf_hub_download,
     load_dataset,
+    set_backoff_recorder,
+    set_hf_call_recorder,
     snapshot_download,
 )
 
@@ -220,18 +217,21 @@ def test_backoff_gives_up_on_httpx_status_error_non_transient() -> None:
     mock_sleep.assert_not_called()
 
 
-def test_hf_telemetry_records_calls_for_wrapped_functions() -> None:
-    hf_telemetry_start_test("tests/test_file.py::test_uses_hf")
-
-    with patch("inspect_ai.dataset.hf_dataset", return_value={"result": "ok"}):
-        result: object = hf_dataset(path="org/repo", split="train", revision="123")
-
-    hf_telemetry_end_test()
+def test_hf_call_recorder_receives_wrapped_function_names() -> None:
+    calls: list[str] = []
+    set_hf_call_recorder(calls.append)
+    try:
+        with patch("inspect_ai.dataset.hf_dataset", return_value={"result": "ok"}):
+            result: object = hf_dataset(path="org/repo", split="train", revision="123")
+    finally:
+        set_hf_call_recorder(None)
 
     assert result == {"result": "ok"}
-    snapshot = hf_telemetry_snapshot()
-    assert snapshot["tests/test_file.py::test_uses_hf"]["hf_calls"] == 1
-    assert snapshot["tests/test_file.py::test_uses_hf"]["hf_functions"]["hf_dataset"] == 1
+    assert calls == ["hf_dataset"]
+
+    with patch("inspect_ai.dataset.hf_dataset", return_value={"result": "ok"}):
+        hf_dataset(path="org/repo", split="train", revision="123")
+    assert calls == ["hf_dataset"], "a removed recorder must not be called"
 
 
 def test_hf_dataset_disables_inspect_ai_retry() -> None:
@@ -242,23 +242,18 @@ def test_hf_dataset_disables_inspect_ai_retry() -> None:
     mock.assert_called_once_with(path="org/repo", split="train", revision="123", retry=False)
 
 
-def test_hf_telemetry_records_backoff_retries_and_sleep_seconds() -> None:
-    hf_telemetry_start_test("tests/test_file.py::test_backoff")
+def test_backoff_recorder_receives_backoff_details() -> None:
+    details: list[dict] = []
+    set_backoff_recorder(details.append)
+    try:
+        with patch("time.sleep"):
+            wrapped = hf_backoff_policy(**BACKOFF_CONFIG)(
+                hf_call_simulated([LocalEntryNotFoundError("Error"), None])
+            )
+            wrapped("foo")
+    finally:
+        set_backoff_recorder(None)
 
-    responses = [
-        LocalEntryNotFoundError("Error"),
-        None,
-    ]
-    sleep_calls: list[float] = []
-
-    with patch("time.sleep") as mock_sleep:
-        mock_sleep.side_effect = lambda x: sleep_calls.append(float(x))
-        wrapped = hf_backoff_policy(**BACKOFF_CONFIG)(hf_call_simulated(responses))
-        wrapped("foo")
-
-    hf_telemetry_end_test()
-
-    snapshot = hf_telemetry_snapshot()
-    metrics = snapshot["tests/test_file.py::test_backoff"]
-    assert metrics["hf_backoff_retries"] == 1
-    assert metrics["hf_backoff_sleep_seconds"] == pytest.approx(sum(sleep_calls))
+    assert len(details) == 1
+    assert details[0]["tries"] == 1
+    assert details[0]["wait"] > 0

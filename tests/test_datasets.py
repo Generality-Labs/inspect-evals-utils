@@ -538,19 +538,19 @@ def test_csv_dataset_exceptions(
         )
 
 
-def test_cache_dir_follows_env_var(tmp_path, monkeypatch):
-    import importlib
+def test_cache_dir_follows_env_var(tmp_path):
+    # A subprocess, because the cache path is read once at import and a reload
+    # would replace the module objects other tests compare by identity.
+    import os
+    import subprocess
+    import sys
 
-    import inspect_evals_utils.cache as cache_module
-    import inspect_evals_utils.datasets as datasets_module
-
-    monkeypatch.setenv("INSPECT_EVALS_CACHE_DIR", str(tmp_path))
-    importlib.reload(cache_module)
-    importlib.reload(datasets_module)
-    try:
-        cached = datasets_module._get_cached_path("my_eval", "https://example.com/data.json")
-        assert cached.startswith(str(tmp_path))
-    finally:
-        monkeypatch.delenv("INSPECT_EVALS_CACHE_DIR")
-        importlib.reload(cache_module)
-        importlib.reload(datasets_module)
+    code = (
+        "from inspect_evals_utils.datasets import _get_cached_path; "
+        "print(_get_cached_path('my_eval', 'https://example.com/data.json'))"
+    )
+    env = {**os.environ, "INSPECT_EVALS_CACHE_DIR": str(tmp_path)}
+    out = subprocess.run(
+        [sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True
+    )
+    assert out.stdout.strip().startswith(str(tmp_path))

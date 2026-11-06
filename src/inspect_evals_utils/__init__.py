@@ -18,6 +18,9 @@ from inspect_evals_utils.scorers import (
     GRADER_FAILED,
     GRADER_PARSE_FAILURE,
     GraderFailureMode,
+    VerdictMatch,
+    VerdictParseFailure,
+    find_verdict,
 )
 from inspect_evals_utils.shuffle import shuffle_and_seed
 
@@ -38,10 +41,13 @@ __all__ = [
     "GraderFailureMode",
     "KnownBrokenSampleError",
     "Prompt",
+    "VerdictMatch",
+    "VerdictParseFailure",
     "__version__",
     "create_stable_id",
     "drop_known_broken",
     "filter_duplicate_ids",
+    "find_verdict",
     "load_csv_dataset",
     "load_json_dataset",
     "message_content_text",

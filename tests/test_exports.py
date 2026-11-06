@@ -20,6 +20,9 @@ EXPORTS = {
     "GRADER_FAILED": "scorers",
     "GRADER_PARSE_FAILURE": "scorers",
     "GraderFailureMode": "scorers",
+    "VerdictMatch": "scorers",
+    "VerdictParseFailure": "scorers",
+    "find_verdict": "scorers",
 }
 
 

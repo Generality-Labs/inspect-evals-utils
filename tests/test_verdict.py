@@ -139,3 +139,59 @@ def test_find_verdict_label_mode_offsets_index_original_text() -> None:
     assert isinstance(result, VerdictMatch)
     assert text[result.start : result.end].lower() == "no"
     assert result.line == "Answer: **no**"
+
+
+MCQ = ["(A)", "(B)", "(C)", "(D)", "(E)"]
+
+LINE_CASES = [
+    # id, text, tokens, position, ignore_quoted, expected
+    ("bare-yes", "yes", YES_NO, "first", False, "yes"),
+    ("bare-n", "n", ["y", "n"], "first", False, "n"),
+    ("bare-zero", "0", ["0", "1"], "first", False, "0"),
+    ("capitalised-first", "Yes, because the file exists.", YES_NO, "first", False, "yes"),
+    ("bold-first", "**No**, the file is missing.", YES_NO, "first", False, "no"),
+    ("bulleted", "- yes", YES_NO, "first", False, "yes"),
+    ("yesterday", "yesterday it worked", YES_NO, "first", False, None),
+    ("knowledge", "knowledge is missing", ["y", "n"], "first", False, None),
+    ("token-mid-line", "I think yes", YES_NO, "first", False, None),
+    ("preface-then-verdict-first", "Based on the file...\nYes", YES_NO, "first", False, None),
+    (
+        "reasoning-starts-with-token",
+        "No tests ran.\nSo overall it is fine.\nYes",
+        YES_NO,
+        "first",
+        False,
+        "no",
+    ),
+    ("last-line-verdict", "Reasoning here.\nyes", YES_NO, "last", False, "yes"),
+    ("two-tokens-fail", "Yes, but no tests were run", YES_NO, "first", False, None),
+    ("mcq-letter", "(C)", MCQ, "first", False, "(C)"),
+    ("mcq-lowercase-in-reasoning", "(C)\n(a) was wrong because...", MCQ, "first", False, "(C)"),
+    ("quoted-skipped", "> yes\nno", YES_NO, "first", True, "no"),
+    ("only-quoted-line", "> yes", YES_NO, "first", True, None),
+    ("overlapping-tokens", "Yes", ["y", "n", "yes", "no"], "first", False, "yes"),
+    ("blank-lines-skipped", "\n\n  no  \n\n", YES_NO, "first", False, "no"),
+    ("crlf", "Reasoning.\r\nno\r\n", YES_NO, "last", False, "no"),
+]
+
+
+@pytest.mark.parametrize(
+    ("text", "tokens", "position", "ignore_quoted", "expected"),
+    [case[1:] for case in LINE_CASES],
+    ids=[case[0] for case in LINE_CASES],
+)
+def test_find_verdict_line_mode(
+    text: str,
+    tokens: list[str],
+    position: str,
+    ignore_quoted: bool,
+    expected: str | None,
+) -> None:
+    result = find_verdict(
+        text, tokens, anchor="line", position=position, ignore_quoted=ignore_quoted
+    )
+    if expected is None:
+        assert isinstance(result, VerdictParseFailure)
+    else:
+        assert isinstance(result, VerdictMatch)
+        assert result.token == expected

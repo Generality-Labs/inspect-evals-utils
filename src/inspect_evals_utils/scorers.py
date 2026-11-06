@@ -114,6 +114,7 @@ _PREFIX = (
 )
 # Between a label and its token: optional emphasis either side of the separator.
 _SEPARATOR = rf"{_EMPHASIS}*{_HSPACE}*[:=>]{_HSPACE}*{_EMPHASIS}*{_HSPACE}*"
+_PREFIX_REGEX = re.compile(rf"^{_PREFIX}")
 _LINE_ENDING = re.compile(r"\r\n|\r|\n")
 _QUOTED = re.compile(rf"^{_HSPACE}*>")
 
@@ -236,7 +237,14 @@ def find_verdict(
             token_list, token_regex, start, line, token_from, "no verdict on the labelled line"
         )
     else:
-        raise NotImplementedError
+        candidates = [(start, line) for start, _end, line in lines if line.strip()]
+        if not candidates:
+            return VerdictParseFailure(text, "no verdict line")
+        start, line = candidates[0] if position == "first" else candidates[-1]
+        prefix_end = _PREFIX_REGEX.match(line).end()  # type: ignore[union-attr]
+        if token_regex.match(line, prefix_end) is None:
+            return VerdictParseFailure(text, "no leading verdict")
+        result = _read_token(token_list, token_regex, start, line, 0, "no leading verdict")
     if isinstance(result, VerdictParseFailure):
         return VerdictParseFailure(text, result.detail)
     return result

@@ -255,6 +255,7 @@ def load_json_dataset(  # type: ignore[empty-body]
     Returns:
         Dataset object
     """
+    raise NotImplementedError  # replaced by the decorated implementation below
 
 
 def load_csv_dataset(  # type: ignore[empty-body]
@@ -302,6 +303,7 @@ def load_csv_dataset(  # type: ignore[empty-body]
     Returns:
         Dataset object
     """
+    raise NotImplementedError  # replaced by the decorated implementation below
 
 
 # Actual decorated implementations

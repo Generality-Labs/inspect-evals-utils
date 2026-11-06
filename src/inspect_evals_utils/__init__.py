@@ -21,6 +21,7 @@ from inspect_evals_utils.scorers import (
     VerdictMatch,
     VerdictParseFailure,
     find_verdict,
+    parse_verdict,
 )
 from inspect_evals_utils.shuffle import shuffle_and_seed
 
@@ -51,6 +52,7 @@ __all__ = [
     "load_csv_dataset",
     "load_json_dataset",
     "message_content_text",
+    "parse_verdict",
     "reasoning_to_text",
     "require_optional_dependency",
     "shuffle_and_seed",

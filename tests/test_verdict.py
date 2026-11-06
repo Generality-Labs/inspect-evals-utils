@@ -1,8 +1,18 @@
 """Tests for the free-text verdict parser in inspect_evals_utils.scorers."""
 
-import pytest
+import math
 
-from inspect_evals_utils.scorers import VerdictMatch, VerdictParseFailure, find_verdict
+import pytest
+from inspect_ai.scorer import CORRECT, INCORRECT
+
+from inspect_evals_utils.scorers import (
+    GRADER_FAILED,
+    GRADER_PARSE_FAILURE,
+    VerdictMatch,
+    VerdictParseFailure,
+    find_verdict,
+    parse_verdict,
+)
 
 
 @pytest.mark.parametrize(
@@ -195,3 +205,47 @@ def test_find_verdict_line_mode(
     else:
         assert isinstance(result, VerdictMatch)
         assert result.token == expected
+
+
+def test_parse_verdict_maps_token_to_value() -> None:
+    result = parse_verdict(
+        "Answer: no",
+        {"yes": CORRECT, "no": INCORRECT},
+        anchor="label",
+        position="last",
+        label="answer",
+    )
+    assert result == INCORRECT
+
+
+def test_parse_verdict_uses_caller_spelling() -> None:
+    result = parse_verdict(
+        "ANSWER: yes",
+        {"Yes": CORRECT, "No": INCORRECT},
+        anchor="label",
+        position="last",
+        label="answer",
+    )
+    assert result == CORRECT
+    match = find_verdict(
+        "ANSWER: yes", ["Yes", "No"], anchor="label", position="last", label="answer"
+    )
+    assert isinstance(match, VerdictMatch)
+    assert match.token == "Yes"
+
+
+def test_parse_verdict_failure_unscored() -> None:
+    failure = parse_verdict(
+        "I cannot tell.", {"yes": True, "no": False}, anchor="line", position="first"
+    )
+    assert isinstance(failure, VerdictParseFailure)
+    score = failure.unscored(answer="the model's answer", metadata={"checkpoint": 3})
+    assert math.isnan(score.as_float())
+    assert score.reason == GRADER_FAILED
+    assert score.answer == "the model's answer"
+    assert score.metadata is not None
+    assert score.metadata["grader_failure_mode"] == GRADER_PARSE_FAILURE
+    assert score.metadata["grader_payload"]["grader_response"] == "I cannot tell."
+    assert score.metadata["checkpoint"] == 3
+    assert score.explanation is not None
+    assert "I cannot tell." in score.explanation

@@ -23,6 +23,7 @@ EXPORTS = {
     "VerdictMatch": "scorers",
     "VerdictParseFailure": "scorers",
     "find_verdict": "scorers",
+    "parse_verdict": "scorers",
 }
 
 

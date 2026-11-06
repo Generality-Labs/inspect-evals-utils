@@ -7,11 +7,13 @@ inspect_evals: it uses private inspect_ai registry APIs.
 """
 
 import re
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
-from typing import Final, Literal
+from typing import Any, Final, Literal, TypeVar
 
-from inspect_ai.scorer import ScoreReason
+from inspect_ai.scorer import Score, ScoreReason
+
+T = TypeVar("T")
 
 GraderFailureMode = Literal[
     "grader_parse_failure",
@@ -79,6 +81,24 @@ class VerdictParseFailure:
 
     text: str
     detail: str
+
+    def unscored(self, **kwargs: Any) -> Score:
+        """Build the unscored ``Score`` for this failure.
+
+        The score has ``reason`` ``grader_failed``,
+        ``metadata["grader_failure_mode"]`` ``grader_parse_failure`` and the
+        reply under ``metadata["grader_payload"]["grader_response"]``, the keys
+        inspect_evals' ``schema_tool_graded_scorer`` records. Keyword arguments
+        pass through to ``Score.unscored``; a ``metadata`` argument is merged
+        over those defaults.
+        """
+        metadata: dict[str, Any] = {
+            "grader_failure_mode": GRADER_PARSE_FAILURE,
+            "grader_payload": {"grader_response": self.text},
+        }
+        metadata.update(kwargs.pop("metadata", None) or {})
+        kwargs.setdefault("explanation", f"{self.detail}: {self.text}")
+        return Score.unscored(reason=GRADER_FAILED, metadata=metadata, **kwargs)
 
 
 def _validate_tokens(tokens: Iterable[str]) -> list[str]:
@@ -248,3 +268,49 @@ def find_verdict(
     if isinstance(result, VerdictParseFailure):
         return VerdictParseFailure(text, result.detail)
     return result
+
+
+def parse_verdict(
+    text: str,
+    tokens: Mapping[str, T],
+    *,
+    anchor: VerdictAnchor,
+    position: VerdictPosition,
+    label: str | None = None,
+    ignore_quoted: bool = False,
+) -> T | VerdictParseFailure:
+    """Read a single-value verdict from a judge's reply and map it to a value.
+
+    This is for a verdict that is one value: yes or no, a letter, one number.
+    A judge that returns several fields (a rubric, a verdict plus a
+    confidence) should use a structured grader, such as a tool call with a
+    schema, rather than this parser.
+
+    On a ``VerdictParseFailure``, a scorer that returns one value returns
+    ``failure.unscored()``. A scorer whose ``Score.value`` is a dict fed by
+    several judges sets this judge's key to ``nan`` and keeps the other keys.
+    Bounded, grader-only retries for a format failure are acceptable before
+    unscoring, and a retry must not be served from the cache.
+
+    Args:
+        text: The judge's reply.
+        tokens: Each verdict the prompt offered, mapped to the value to return.
+        anchor: As for ``find_verdict``.
+        position: As for ``find_verdict``.
+        label: As for ``find_verdict``.
+        ignore_quoted: As for ``find_verdict``.
+
+    Returns:
+        The value mapped from the matched token, or a ``VerdictParseFailure``.
+    """
+    match = find_verdict(
+        text,
+        tokens.keys(),
+        anchor=anchor,
+        position=position,
+        label=label,
+        ignore_quoted=ignore_quoted,
+    )
+    if isinstance(match, VerdictParseFailure):
+        return match
+    return tokens[match.token]

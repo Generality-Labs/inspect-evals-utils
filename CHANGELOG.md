@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 <!-- scriv-insert-here -->
 
+## [0.2.0] - 2026-11-06
+
+### Added
+
+- `inspect_evals_utils.scorers`, with the grader vocabulary moved from `inspect_evals.utils.scorers`: the `ScoreReason` constants and `GraderFailureMode`. `schema_tool_graded_scorer` stays in inspect_evals.
+- `find_verdict` and `parse_verdict`, a parser for single-value free-text judge verdicts following the decisions on UKGovernmentBEIS/inspect_evals#2600: a labelled line or a leading token, a required `position`, no fallback verdict, and `VerdictParseFailure.unscored()` for the failure score. `verdict_instruction` and `VERDICT_LABEL` give the closing sentence for prompts an eval words itself.
+
 ## [0.1.0] - 2026-11-06
 
 ### Added

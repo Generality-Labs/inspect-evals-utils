@@ -2,7 +2,7 @@
 # uv's own backend. It builds src/inspect_evals_utils/ with no further config.
 # Keep the upper bound at the next uv minor, as `uv init` writes it, and raise
 # both bounds when moving to a new uv minor.
-requires = ["uv_build>=0.12.22,<0.13.0"]
+requires = ["uv_build>=0.12.22,<0.14.0"]
 build-backend = "uv_build"
 
 [project]
@@ -44,7 +44,7 @@ dev = [
     "pytest-cov>=7.0.0",
     "basedpyright>=1.39",
     "pre-commit>=4.0.0",
-    "ruff==0.15.20",
+    "ruff==0.17.3",
     "scriv>=1.8",
     "datasets>=4.8.5",
     "httpx>=0.27.0",

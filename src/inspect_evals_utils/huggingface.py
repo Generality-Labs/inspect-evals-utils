@@ -215,10 +215,12 @@ def should_retry(err: Exception) -> bool:
 
     if isinstance(err, FileNotFoundError):
         inferred_network_errors = [
-            "An error happened while trying to locate the file on the Hub "
-            "and we cannot find the requested files in the local cache. "
-            "Please check your connection and try again or make sure your "
-            "Internet connection is on.",
+            (
+                "An error happened while trying to locate the file on the Hub "
+                "and we cannot find the requested files in the local cache. "
+                "Please check your connection and try again or make sure your "
+                "Internet connection is on."
+            ),
             "on the Hugging Face Hub either",
         ]
         return any(

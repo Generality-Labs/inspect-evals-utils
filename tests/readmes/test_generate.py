@@ -1,9 +1,13 @@
 """Tests for inspect_evals_utils.readmes.generate."""
 
+import shutil
 from pathlib import Path
+
+import pytest
 
 from inspect_evals_utils.readmes.generate import (
     EvalInfo,
+    TaskImportError,
     TaskInfo,
     _clean_default_value,
     _format_parameter,
@@ -11,6 +15,7 @@ from inspect_evals_utils.readmes.generate import (
     _parse_docstring_parameters,
     build_parameters_section,
     generate_basic_readme,
+    generate_readmes,
     readme_exists,
 )
 
@@ -272,3 +277,17 @@ class TestBuildParametersSection:
         assert "## Parameters" in text
         assert "`limit`" in text
         assert "`shuffle`" in text
+
+
+class TestGenerateReadmesFailures:
+    def test_unknown_eval_raises(self, tmp_path: Path) -> None:
+        src = tmp_path / "src"
+        shutil.copytree(FIXTURE_DIR, src / "sample_eval")
+        with pytest.raises(LookupError, match="no_such_eval"):
+            generate_readmes(src, eval_name="no_such_eval")
+
+    def test_unimportable_task_package_raises(self, tmp_path: Path) -> None:
+        src = tmp_path / "src"
+        shutil.copytree(FIXTURE_DIR, src / "unimportable_eval")
+        with pytest.raises(TaskImportError, match="unimportable_eval"):
+            generate_readmes(src, check=True)

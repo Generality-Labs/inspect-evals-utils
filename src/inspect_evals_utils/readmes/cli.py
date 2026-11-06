@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from inspect_evals_utils.readmes.generate import generate_readmes
+from inspect_evals_utils.readmes.generate import TaskImportError, generate_readmes
 from inspect_evals_utils.readmes.sections import add_section
 
 
@@ -43,13 +43,17 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "generate":
-        changed = generate_readmes(
-            Path(args.src),
-            eval_name=args.eval,
-            create_missing=args.create_missing,
-            include_examples=args.include_examples,
-            check=args.check,
-        )
+        try:
+            changed = generate_readmes(
+                Path(args.src),
+                eval_name=args.eval,
+                create_missing=args.create_missing,
+                include_examples=args.include_examples,
+                check=args.check,
+            )
+        except (LookupError, TaskImportError) as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
         if args.check and changed:
             print("READMEs out of date:", *(str(p) for p in changed), sep="\n  ")
             return 1

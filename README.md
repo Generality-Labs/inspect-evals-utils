@@ -1,6 +1,6 @@
 # inspect-evals-utils
 
-Runtime helpers for [Inspect AI](https://inspect.aisi.org.uk/) evaluations, moved out of [inspect_evals](https://github.com/UKGovernmentBEIS/inspect_evals) so that a standalone eval repo can use them without depending on the whole registry. inspect_evals depends on this package and re-exports everything under its old `inspect_evals.utils` paths.
+Runtime helpers for [Inspect AI](https://inspect.aisi.org.uk/) evaluations, moved out of [inspect_evals](https://github.com/UKGovernmentBEIS/inspect_evals) so that a standalone eval repo can use them without depending on the whole registry. inspect_evals will depend on this package and re-export everything under its old `inspect_evals.utils` paths, so existing imports keep working.
 
 ## Install
 

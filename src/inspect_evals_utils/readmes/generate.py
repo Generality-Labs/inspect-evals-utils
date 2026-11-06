@@ -569,6 +569,23 @@ def readme_exists(eval_info: EvalInfo) -> bool:
 # ---------------------------------------------------------------------------
 
 
+class TaskImportError(ImportError):
+    """A task named in eval.yaml could not be imported from its package."""
+
+
+def missing_tasks(eval_info: EvalInfo) -> list[str]:
+    """Return the `package.task` names in eval.yaml that cannot be imported."""
+    missing: list[str] = []
+    try:
+        pkg = importlib.import_module(eval_info.package_name)
+    except ImportError:
+        return [f"{eval_info.package_name}.{task.name}" for task in eval_info.tasks]
+    for task in eval_info.tasks:
+        if not hasattr(pkg, task.name):
+            missing.append(f"{eval_info.package_name}.{task.name}")
+    return missing
+
+
 def generate_readmes(
     src_dir: Path,
     *,
@@ -589,21 +606,34 @@ def generate_readmes(
 
     Returns:
         The README paths that changed, or would change under `check`.
+
+    Raises:
+        LookupError: `eval_name` matched no eval.
+        TaskImportError: a task in some eval.yaml could not be imported; that
+            eval's README is left untouched.
     """
     evals = discover_evals(src_dir, include_examples=include_examples)
     if eval_name:
         evals = [e for e in evals if e.package_name == eval_name]
         if not evals:
-            print(f"No eval found matching '{eval_name}'")
-            return []
+            raise LookupError(f"No eval found matching '{eval_name}'")
     if not evals:
         print(f"No evaluations found under {src_dir}")
         return []
 
     changed: list[Path] = []
+    failures: list[str] = []
     for eval_info in evals:
         print(f"Processing: {eval_info.title} ({eval_info.path})")
         readme_path = Path(eval_info.path) / "README.md"
+
+        # The Parameters section is read from the task functions. Rewriting it
+        # when they can't be imported would record "No task parameters." as fact.
+        missing = missing_tasks(eval_info)
+        if missing:
+            print(f"  Skipping: cannot import {', '.join(missing)}")
+            failures.extend(missing)
+            continue
 
         if create_missing and not readme_exists(eval_info):
             if not check:
@@ -632,4 +662,9 @@ def generate_readmes(
             if readme_path not in changed:
                 changed.append(readme_path)
             print("  Would update" if check else "  Updated auto-generated sections")
+    if failures:
+        raise TaskImportError(
+            "Could not import these tasks (is the eval installed in this environment?): "
+            + ", ".join(failures)
+        )
     return changed

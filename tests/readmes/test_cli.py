@@ -51,3 +51,18 @@ def test_add_section_subcommand(tmp_path: Path) -> None:
     assert new.index("<!-- /Options: Automatically Generated -->") < new.index(
         "<!-- Parameters: Automatically Generated -->"
     )
+
+
+def test_generate_exits_one_when_eval_filter_matches_nothing(tmp_path: Path) -> None:
+    src = _copy_fixture(tmp_path)
+    assert main(["generate", "--src", str(src), "--eval", "no_such_eval"]) == 1
+
+
+def test_check_exits_one_when_task_package_cannot_be_imported(tmp_path: Path) -> None:
+    src = tmp_path / "src"
+    shutil.copytree(FIXTURE, src / "unimportable_eval")
+    readme = src / "unimportable_eval" / "README.md"
+    before = readme.read_bytes()
+    assert main(["generate", "--check", "--src", str(src)]) == 1
+    assert readme.read_bytes() == before
+    assert main(["generate", "--src", str(src)]) == 1

@@ -30,7 +30,16 @@ Downloads land in `INSPECT_EVALS_CACHE_PATH`, which defaults to the platform use
 
 ## README generation
 
-The `inspect-evals-readmes` command (see the next release's section once it ships) rewrites the generated sections of an eval's README from its `eval.yaml` and `@task` signatures.
+The `inspect-evals-readmes` command rewrites the generated sections of each eval's README (Contributors, Usage, Options and Parameters) from its `eval.yaml` and `@task` signatures. It finds evals as `<src>/<eval>/eval.yaml` (default `src`), imports each package to read the task parameters, and writes between the `<!-- Usage: Automatically Generated -->` style tag pairs.
+
+```bash
+uv run inspect-evals-readmes generate                      # rewrite the sections
+uv run inspect-evals-readmes generate --check              # exit 1 if any README is out of date; writes nothing
+uv run inspect-evals-readmes generate --eval my_eval --create-missing
+uv run inspect-evals-readmes add-section --key Parameters --insert-after Options
+```
+
+`add-section` inserts a missing tag pair after the first listed section it finds, or at the end of the file.
 
 ## Private inspect_ai APIs
 

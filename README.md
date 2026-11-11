@@ -18,6 +18,7 @@ uv add "inspect-evals-utils[huggingface]"
 - `inspect_evals_utils.code`: `extract_code_blocks`, `extract_code_block`, `strip_json_fence`, `defines`.
 - `inspect_evals_utils.scorers`: the `ScoreReason` constants (`GRADER_FAILED`, `SCORING_FAILED`, `NO_RESPONSE`, `REFUSAL`, `INVALID_RESPONSE_FORMAT`) and `GraderFailureMode` with its constants, moved from `inspect_evals.utils.scorers`; and the free-text verdict parser `find_verdict`, `parse_verdict`, `VerdictMatch`, `VerdictParseFailure`, with `VERDICT_LABEL` and `verdict_instruction` for prompts an eval words itself. The parser reads one value (yes/no, a letter, one number) from a labelled line or a leading token, with a required `position` and no fallback verdict.
 - `inspect_evals_utils.messages`: `message_content_text`, `reasoning_to_text`.
+- `inspect_evals_utils.metadata`: `load_eval_version`, which reads the `version` field of the `eval.yaml` beside a task module. Call it as `load_eval_version(__file__)`.
 - `inspect_evals_utils.prompts`: `Prompt`, a dataclass recording a prompt with its provenance.
 - `inspect_evals_utils.shuffle`: `shuffle_and_seed`.
 - `inspect_evals_utils.cache`: `cache_path()` and `INSPECT_EVALS_CACHE_PATH`.

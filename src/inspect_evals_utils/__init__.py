@@ -13,6 +13,7 @@ from inspect_evals_utils.ids import (
     require_optional_dependency,
 )
 from inspect_evals_utils.messages import message_content_text, reasoning_to_text
+from inspect_evals_utils.metadata import load_eval_version
 from inspect_evals_utils.prompts import Prompt
 from inspect_evals_utils.scorers import (
     GRADER_FAILED,
@@ -53,6 +54,7 @@ __all__ = [
     "filter_duplicate_ids",
     "find_verdict",
     "load_csv_dataset",
+    "load_eval_version",
     "load_json_dataset",
     "message_content_text",
     "parse_verdict",

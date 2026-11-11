@@ -17,6 +17,7 @@ EXPORTS = {
     "Prompt": "prompts",
     "shuffle_and_seed": "shuffle",
     "INSPECT_EVALS_CACHE_PATH": "cache",
+    "load_eval_version": "metadata",
     "GRADER_FAILED": "scorers",
     "GRADER_PARSE_FAILURE": "scorers",
     "GraderFailureMode": "scorers",

@@ -166,6 +166,16 @@ LABEL_CASES = [
     ),
     ("underscore-joined-before", "ANSWER: not_correct", "answer", CI, "last", False, None),
     (
+        "tag-label-is-a-token-word",
+        "<correct>incorrect</correct>",
+        "correct",
+        CI,
+        "last",
+        False,
+        "INCORRECT",
+    ),
+    ("tag-then-second-token", "<answer>yes</answer> no", "answer", YES_NO, "last", False, None),
+    (
         "all-fields-verdict-in-reasoning",
         "extracted_final_answer: 42\nreasoning: no, it does not match\nconfidence: 90",
         "correct",

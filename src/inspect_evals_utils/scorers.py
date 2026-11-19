@@ -185,6 +185,11 @@ def _label_regex(label: str) -> re.Pattern[str]:
     )
 
 
+def _closing_tag_regex(label: str) -> re.Pattern[str]:
+    """Match the closing tag of the ``<label>...</label>`` form."""
+    return re.compile(rf"<{_HSPACE}*/{_HSPACE}*{re.escape(label)}{_HSPACE}*>", re.IGNORECASE)
+
+
 def _read_token(
     tokens: list[str],
     token_regex: re.Pattern[str],
@@ -193,18 +198,21 @@ def _read_token(
     lead_offset: int,
     scan_offset: int,
     detail_when_missing: str,
+    ignore: re.Pattern[str] | None = None,
 ) -> VerdictMatch | VerdictParseFailure:
     """Read the token at ``lead_offset``, the one verdict on the line from ``scan_offset``.
 
     A token later on the line is not read in place of a missing leading one:
     ``ANSWER: not correct`` holds no verdict. A line that names two different
     tokens is a failure: ``Answer: yes or no`` carries no verdict, and reading
-    its first token would hide that.
+    its first token would hide that. Text matched by ``ignore`` is blanked
+    out before that scan.
     """
     lead = token_regex.match(line, lead_offset)
     if lead is None:
         return VerdictParseFailure(line, detail_when_missing)
-    if len({m.lastgroup for m in token_regex.finditer(line, scan_offset)}) > 1:
+    scanned = line if ignore is None else ignore.sub(lambda m: " " * len(m[0]), line)
+    if len({m.lastgroup for m in token_regex.finditer(scanned, scan_offset)}) > 1:
         return VerdictParseFailure(line, "two verdicts on one line")
     return VerdictMatch(
         token=_matched_token(tokens, lead),
@@ -235,7 +243,8 @@ def find_verdict(
     ``anchor="label"`` that check scans the line from just after the
     separator, so a label that is itself a token (``Correct: INCORRECT``) or a
     numbered list marker (``1. Rating: 3``) does not count as a second
-    verdict. Under ``anchor="line"`` it scans the whole line.
+    verdict, and it skips the closing tag of the ``<label>...</label>`` form.
+    Under ``anchor="line"`` it scans the whole line.
 
     Args:
         text: The judge's reply.
@@ -292,6 +301,7 @@ def find_verdict(
             value_start,
             value_start,
             "no verdict leads the labelled value",
+            ignore=_closing_tag_regex(label),
         )
     else:
         candidates = [(start, line) for start, _end, line in lines if line.strip()]

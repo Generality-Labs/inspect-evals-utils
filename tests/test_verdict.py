@@ -45,6 +45,7 @@ def test_find_verdict_empty_text_is_failure(text: str, anchor: str) -> None:
 
 
 YES_NO = ["yes", "no"]
+CI = ["CORRECT", "INCORRECT"]
 
 LABEL_CASES = [
     # id, text, label, tokens, position, ignore_quoted, expected
@@ -142,6 +143,37 @@ LABEL_CASES = [
     ("trailing-punctuation", "ANSWER: yes.", "answer", YES_NO, "last", False, "yes"),
     ("token-prefix-of-word", "Answer: yesterday", "answer", YES_NO, "last", False, None),
     ("crlf", "Reasoning.\r\nAnswer: no\r\n", "answer", YES_NO, "last", False, "no"),
+    ("quoted-token", 'ANSWER: "yes"', "answer", YES_NO, "last", False, "yes"),
+    ("token-after-negation", "ANSWER: not correct", "answer", CI, "last", False, None),
+    ("token-after-qualifier", "ANSWER: partially correct", "answer", CI, "last", False, None),
+    (
+        "token-after-prose",
+        "correct: unclear, there is no final answer",
+        "correct",
+        YES_NO,
+        "last",
+        False,
+        None,
+    ),
+    (
+        "token-inside-sentence",
+        "correct: I cannot say yes with confidence",
+        "correct",
+        YES_NO,
+        "last",
+        False,
+        None,
+    ),
+    ("underscore-joined-before", "ANSWER: not_correct", "answer", CI, "last", False, None),
+    (
+        "all-fields-verdict-in-reasoning",
+        "extracted_final_answer: 42\nreasoning: no, it does not match\nconfidence: 90",
+        "correct",
+        YES_NO,
+        "last",
+        False,
+        None,
+    ),
 ]
 
 

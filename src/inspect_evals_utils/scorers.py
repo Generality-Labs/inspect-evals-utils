@@ -135,8 +135,10 @@ _PREFIX = (
     rf"(?:{_HSPACE}*+(?:[-*+]{_HSPACE}++|\d+[.)]{_HSPACE}++|>{_HSPACE}*+|#+{_HSPACE}++"
     rf"|{_EMPHASIS}++))*+{_HSPACE}*+"
 )
-# Between a label and its token: optional emphasis either side of the separator.
-_SEPARATOR = rf"{_EMPHASIS}*{_HSPACE}*[:=>]{_HSPACE}*{_EMPHASIS}*{_HSPACE}*"
+# Between a label and its token: optional emphasis either side of the separator, and
+# emphasis or an opening quote mark before the token.
+_OPEN_QUOTE = "[\"'\u201c\u2018]"
+_SEPARATOR = rf"{_EMPHASIS}*{_HSPACE}*[:=>](?:{_HSPACE}|{_EMPHASIS}|{_OPEN_QUOTE})*+"
 _PREFIX_REGEX = re.compile(rf"^{_PREFIX}")
 _LINE_ENDING = re.compile(r"\r\n|\r|\n")
 _QUOTED = re.compile(rf"^{_HSPACE}*>")
@@ -188,25 +190,26 @@ def _read_token(
     token_regex: re.Pattern[str],
     line_start: int,
     line: str,
-    from_offset: int,
+    lead_offset: int,
+    scan_offset: int,
     detail_when_missing: str,
 ) -> VerdictMatch | VerdictParseFailure:
-    """Read the one verdict on a candidate line, scanning from ``from_offset``.
+    """Read the token at ``lead_offset``, the one verdict on the line from ``scan_offset``.
 
-    A line that names two different tokens is a failure: ``Answer: yes or no``
-    carries no verdict, and reading its first token would hide that.
+    A token later on the line is not read in place of a missing leading one:
+    ``ANSWER: not correct`` holds no verdict. A line that names two different
+    tokens is a failure: ``Answer: yes or no`` carries no verdict, and reading
+    its first token would hide that.
     """
-    matches = list(token_regex.finditer(line, from_offset))
-    distinct = {m.lastgroup for m in matches}
-    if not distinct:
+    lead = token_regex.match(line, lead_offset)
+    if lead is None:
         return VerdictParseFailure(line, detail_when_missing)
-    if len(distinct) > 1:
+    if len({m.lastgroup for m in token_regex.finditer(line, scan_offset)}) > 1:
         return VerdictParseFailure(line, "two verdicts on one line")
-    first = matches[0]
     return VerdictMatch(
-        token=_matched_token(tokens, first),
-        start=line_start + first.start(),
-        end=line_start + first.end(),
+        token=_matched_token(tokens, lead),
+        start=line_start + lead.start(),
+        end=line_start + lead.end(),
         line=line,
     )
 
@@ -222,11 +225,17 @@ def find_verdict(
 ) -> VerdictMatch | VerdictParseFailure:
     """Read a single-value verdict from a judge's free-text reply.
 
-    The selected line must name exactly one token. Under ``anchor="label"``
-    that check scans the line from just after the separator, so a label that
-    is itself a token (``Correct: INCORRECT``) or a numbered list marker
-    (``1. Rating: 3``) does not count as a second verdict. Under
-    ``anchor="line"`` it scans the whole line.
+    The token must lead the value: under ``anchor="label"`` it comes straight
+    after the separator, allowing only markdown emphasis and an opening quote
+    mark between them, so ``ANSWER: not correct`` holds no verdict. Under
+    ``anchor="line"`` it comes straight after the line's list, quote, heading
+    and emphasis markers.
+
+    The selected line must also name exactly one token. Under
+    ``anchor="label"`` that check scans the line from just after the
+    separator, so a label that is itself a token (``Correct: INCORRECT``) or a
+    numbered list marker (``1. Rating: 3``) does not count as a second
+    verdict. Under ``anchor="line"`` it scans the whole line.
 
     Args:
         text: The judge's reply.
@@ -274,9 +283,15 @@ def find_verdict(
         ]
         if not labelled:
             return VerdictParseFailure(text, "no labelled line")
-        start, line, token_from = labelled[0] if position == "first" else labelled[-1]
+        start, line, value_start = labelled[0] if position == "first" else labelled[-1]
         result = _read_token(
-            token_list, token_regex, start, line, token_from, "no verdict on the labelled line"
+            token_list,
+            token_regex,
+            start,
+            line,
+            value_start,
+            value_start,
+            "no verdict leads the labelled value",
         )
     else:
         candidates = [(start, line) for start, _end, line in lines if line.strip()]
@@ -284,9 +299,9 @@ def find_verdict(
             return VerdictParseFailure(text, "no verdict line")
         start, line = candidates[0] if position == "first" else candidates[-1]
         prefix_end = _PREFIX_REGEX.match(line).end()  # type: ignore[union-attr]
-        if token_regex.match(line, prefix_end) is None:
-            return VerdictParseFailure(text, "no leading verdict")
-        result = _read_token(token_list, token_regex, start, line, 0, "no leading verdict")
+        result = _read_token(
+            token_list, token_regex, start, line, prefix_end, 0, "no leading verdict"
+        )
     if isinstance(result, VerdictParseFailure):
         return VerdictParseFailure(text, result.detail)
     return result

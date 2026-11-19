@@ -158,18 +158,39 @@ def _iter_lines(text: str) -> Iterator[tuple[int, int, str]]:
         yield start, len(text), text[start:]
 
 
+# A letter or digit, which ``\w`` also matches along with ``_``.
+_ALNUM = r"[^\W_]"
+
+
+def _whole_token(token: str) -> str:
+    """The pattern for one token as a whole word.
+
+    ``_`` counts as punctuation, so a token wrapped in underscore emphasis is
+    still a whole word, unless the underscore joins it to a letter or digit
+    (``not_correct``). A token that starts or ends with a digit must also not
+    be part of a longer number: ``3.7``, ``-1``, ``0.5`` and ``4/5`` hold no
+    single-digit token.
+    """
+    before = rf"(?<!{_ALNUM})(?<!{_ALNUM}_)"
+    after = rf"(?!{_ALNUM})(?!_+{_ALNUM})"
+    if token[0].isdigit():
+        before += r"(?<![-+.\u2212\u2013])(?<!\d[,/])"
+    if token[-1].isdigit():
+        after += r"(?![-.,/\u2013]\d)"
+    return f"{before}{re.escape(token)}{after}"
+
+
 def _token_regex(tokens: list[str]) -> re.Pattern[str]:
     """Match any token as a whole word, case-insensitively, longest token first.
 
     Each token gets a named group ``t<index>`` so a match maps back to the
     caller's spelling through ``lastgroup`` rather than through a second case
     fold, which can disagree with ``re.IGNORECASE`` (U+0131 folds to itself but
-    matches ``i``). The boundaries treat ``_`` as punctuation, so a token
-    wrapped in underscore emphasis is still a whole word.
+    matches ``i``).
     """
     order = sorted(range(len(tokens)), key=lambda i: len(tokens[i]), reverse=True)
-    alternatives = "|".join(f"(?P<t{i}>{re.escape(tokens[i])})" for i in order)
-    return re.compile(rf"(?<![^\W_])(?:{alternatives})(?![^\W_])", re.IGNORECASE)
+    alternatives = "|".join(f"(?P<t{i}>{_whole_token(tokens[i])})" for i in order)
+    return re.compile(alternatives, re.IGNORECASE)
 
 
 def _matched_token(tokens: list[str], match: re.Match[str]) -> str:

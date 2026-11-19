@@ -46,6 +46,7 @@ def test_find_verdict_empty_text_is_failure(text: str, anchor: str) -> None:
 
 YES_NO = ["yes", "no"]
 CI = ["CORRECT", "INCORRECT"]
+ONE_TO_FIVE = ["1", "2", "3", "4", "5"]
 
 LABEL_CASES = [
     # id, text, label, tokens, position, ignore_quoted, expected
@@ -175,6 +176,15 @@ LABEL_CASES = [
         "INCORRECT",
     ),
     ("tag-then-second-token", "<answer>yes</answer> no", "answer", YES_NO, "last", False, None),
+    ("underscore-joined-after", "ANSWER: no_answer", "answer", YES_NO, "last", False, None),
+    ("decimal-rating", "Rating: 3.7", "rating", ONE_TO_FIVE, "last", False, None),
+    ("negative-rating", "Rating: -1", "rating", ONE_TO_FIVE, "last", False, None),
+    ("decimal-below-one", "Score: 0.5", "score", ["0", "1"], "last", False, None),
+    ("fraction-full-marks", "Rating: 5/5", "rating", ONE_TO_FIVE, "last", False, None),
+    ("fraction", "Rating: 4/5", "rating", ONE_TO_FIVE, "last", False, None),
+    ("range", "Rating: 3-4", "rating", ONE_TO_FIVE, "last", False, None),
+    ("rating-full-stop", "Rating: 4.", "rating", ONE_TO_FIVE, "last", False, "4"),
+    ("rating-then-comma", "Rating: 4, because", "rating", ONE_TO_FIVE, "last", False, "4"),
     (
         "all-fields-verdict-in-reasoning",
         "extracted_final_answer: 42\nreasoning: no, it does not match\nconfidence: 90",
@@ -250,6 +260,8 @@ LINE_CASES = [
     ("overlapping-tokens", "Yes", ["y", "n", "yes", "no"], "first", False, "yes"),
     ("blank-lines-skipped", "\n\n  no  \n\n", YES_NO, "first", False, "no"),
     ("crlf", "Reasoning.\r\nno\r\n", YES_NO, "last", False, "no"),
+    ("underscore-joined", "no_answer was given", YES_NO, "first", False, None),
+    ("decimal-leading", "3.7 overall", ONE_TO_FIVE, "first", False, None),
 ]
 
 

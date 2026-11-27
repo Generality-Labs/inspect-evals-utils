@@ -1,3 +1,8 @@
+"""Hugging Face wrappers that retry on rate limits and transient errors, and require a pinned ``revision=``.
+
+Needs the ``huggingface`` extra: ``uv add "inspect-evals-utils[huggingface]"``.
+"""
+
 import functools
 import os
 from collections.abc import Callable

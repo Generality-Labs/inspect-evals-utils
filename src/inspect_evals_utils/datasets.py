@@ -1,10 +1,16 @@
+"""Load JSON and CSV datasets, caching remote files and retrying transient download errors.
+
+Remote files are downloaded once into the shared cache directory (see
+:mod:`inspect_evals_utils.cache`) and read from there on later runs.
+"""
+
 import hashlib
 import logging
 import os
 from collections.abc import Callable
 from functools import wraps
 from pathlib import Path
-from typing import Any, Concatenate, ParamSpec, cast
+from typing import TYPE_CHECKING, Any, Concatenate, ParamSpec, cast
 from urllib.parse import urlparse
 
 import backoff  # type: ignore
@@ -216,7 +222,7 @@ def cache_dataset_loader() -> Callable[
     return decorate
 
 
-# Type stub functions for mypy
+# The loaders' signatures and docstrings; the implementations below replace them.
 def load_json_dataset(
     file_path: str,
     eval_name: str,
@@ -306,6 +312,8 @@ def load_csv_dataset(
     raise NotImplementedError  # replaced by the decorated implementation below
 
 
-# Actual decorated implementations
-load_json_dataset = cache_dataset_loader()(json_dataset)  # type: ignore[assignment,arg-type]  # noqa: F811
-load_csv_dataset = cache_dataset_loader()(csv_dataset)  # type: ignore[assignment,arg-type]  # noqa: F811
+# The decorated implementations replace the stubs at runtime. Type checkers and the
+# docs (griffe) skip this block, so they read the stubs' signatures and docstrings.
+if not TYPE_CHECKING:
+    load_json_dataset = cache_dataset_loader()(json_dataset)
+    load_csv_dataset = cache_dataset_loader()(csv_dataset)

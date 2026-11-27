@@ -1,3 +1,6 @@
+"""Turn a ``shuffle`` task parameter into a dataset loader's ``shuffle`` and ``seed``."""
+
+
 def shuffle_and_seed(shuffle: bool | int) -> tuple[bool, int | None]:
     """Split a ``shuffle`` task parameter into a loader's ``shuffle`` and ``seed``.
 

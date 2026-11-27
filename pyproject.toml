@@ -55,6 +55,10 @@ dev = [
     "types-PyYAML",
     "types-requests",
 ]
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.29",
+]
 
 
 [tool.scriv]

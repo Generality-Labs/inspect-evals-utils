@@ -2,6 +2,8 @@
 
 Runtime helpers for [Inspect AI](https://inspect.aisi.org.uk/) evaluations, moved out of [inspect_evals](https://github.com/UKGovernmentBEIS/inspect_evals) so that a standalone eval repo can use them without depending on the whole registry. inspect_evals will depend on this package and re-export everything under its old `inspect_evals.utils` paths, so existing imports keep working.
 
+Documentation, including an API reference generated from the docstrings: <https://inspect-evals-utils.generality.org/>. For agents, [`llms.txt`](https://inspect-evals-utils.generality.org/llms.txt) indexes the site in the [llms.txt](https://llmstxt.org) convention, [`llms-full.txt`](https://inspect-evals-utils.generality.org/llms-full.txt) is every page concatenated, and each page's Markdown is served at its path with a `.md` suffix (for example `reference/ids.md`).
+
 ## Install
 
 ```bash
@@ -56,6 +58,8 @@ uv run basedpyright src
 ```
 
 Each pull request adds a changelog fragment rather than editing `CHANGELOG.md`, so concurrent PRs don't conflict. Run `uv run scriv create`, uncomment the sections that apply in the new file under `changelog.d/`, and commit it with the change, or delete it if the change needs no entry. To release, run the **Prepare release** workflow from the Actions tab. It bumps `version` in `pyproject.toml`, collects the fragments into `CHANGELOG.md`, and opens a release pull request, whose CI starts once you click **Approve workflows to run** on it; merging it tags the release. It needs _Settings → Actions → General_ → **Allow GitHub Actions to create and approve pull requests**. By hand, the same is `uv version --bump minor` and `uv run scriv collect`.
+
+The documentation site is built by mkdocs with [mkdocstrings](https://mkdocstrings.github.io/): `mkdocs_hooks.py` generates every page at build time (the front page from this README, one reference page per public module), so a new module or docstring needs no docs change. A new module needs a module docstring, whose first line is its summary in the reference index. `uv run --group docs mkdocs serve` previews the site, and `.github/workflows/docs.yml` publishes it to GitHub Pages from main.
 
 Linting (ruff, [zizmor](https://docs.zizmor.sh/), mdformat) runs via [pre-commit](https://pre-commit.com); CI runs the same stack plus basedpyright and pytest via the shared [`python-ci`](https://github.com/Generality-Labs/python-project-template) reusable workflow.
 

@@ -1,0 +1,78 @@
+# Built and deployed by .github/workflows/docs.yml. Every page but robots.txt is
+# added at build time by mkdocs_hooks.py: the front page from the README, one
+# API reference page per module under reference/ (rendered from the docstrings
+# by mkdocstrings), llms.txt and llms-full.txt. The nav is derived from those
+# files, so a new module gets a page without editing this file.
+site_name: inspect-evals-utils
+site_description: Runtime helpers for Inspect AI evaluations
+site_url: https://inspect-evals-utils.generality.org/
+repo_url: https://github.com/Generality-Labs/inspect-evals-utils
+repo_name: Generality-Labs/inspect-evals-utils
+edit_uri: ""
+docs_dir: docs
+strict: true
+# The hooks build the front page and the reference pages from these, so
+# `mkdocs serve` rebuilds when they change.
+watch:
+  - README.md
+  - src/inspect_evals_utils
+
+# Adds the generated pages, and copies each page's Markdown into the site next
+# to its HTML, for agents.
+hooks:
+  - mkdocs_hooks.py
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+  # Follows the reader's system light/dark setting; the toggle overrides it
+  # and remembers the choice.
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            members_order: source
+            show_source: false
+            show_root_heading: false
+            show_root_toc_entry: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            show_signature_annotations: true
+            separate_signature: true
+            signature_crossrefs: true
+            # Constants such as GRADER_FAILED are documented by a comment, not a
+            # docstring, and are still public API. Keep in step with
+            # HIDDEN_MEMBER in mkdocs_hooks.py, which renders the Markdown copy.
+            show_if_no_docstring: true
+            filters: ["!^_", "!^[A-Z]$", "!^IdT$", "!^logger$"]
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
